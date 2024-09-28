@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synchronisation et Recherche Gmail</title>
+    <style>
+        #progress, #searchResults {
+            font-family: monospace;
+            white-space: pre-wrap;
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .search-container {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Synchronisation et Recherche Gmail</h1>
+    <div>
+        <h2>Synchronisation</h2>
+        <button id="syncButton">Démarrer la synchronisation</button>
+        <button id="forceSyncButton">Synchroniser avec force</button>
+        <select id="year">
+            <option value="2024">2024</option>
+            <option value="2023">2023</option>
+            <option value="2022">2022</option>
+            <option value="2021">2021</option>
+            <option value="2020">2020</option>
+            <option value="2019">2019</option>
+            <option value="2018">2018</option>
+            <option value="2017">2017</option>
+            <option value="2016">2016</option>
+        </select>
+        <select id="month">
+            <option value="1">Janvier</option>
+            <option value="2">Février</option>
+            <option value="3">Mars</option>
+            <option value="4">Avril</option>
+            <option value="5">Mai</option>
+            <option value="6">Juin</option>
+            <option value="7">Juillet</option>
+            <option value="8">Août</option>
+            <option value="9">Septembre</option>	
+        </select>
+        <div id="progress"></div>
+    </div>
+
+    <div class="search-container">
+        <h2>Recherche</h2>
+        <input type="text" id="searchInput" placeholder="Entrez votre recherche...">
+        <button id="searchButton">Rechercher</button>
+        <div id="searchResults"></div>
+    </div>
+
+    <script>
+        function startSync(forceSync = false) {
+            const year = document.getElementById('year').value;
+            const month = document.getElementById('month').value;
+            const eventSource = new EventSource(`/api/v1/gmail/synchronize?year=${year}&month=${month}&force_sync=${forceSync}`);
+            console.log("START SYNC", year, month, forceSync);
+            eventSource.onmessage = function(event) {
+                const message = event.data;
+                console.log(message);
+                document.getElementById('progress').innerHTML += message + '<br>';
+            };
+
+            eventSource.onerror = function(error) {
+                console.error('EventSource failed:', error);
+                eventSource.close();
+            };
+        }
+
+        async function searchDocuments() {
+            const searchTerm = document.getElementById('searchInput').value;
+            try {
+                const response = await fetch(`/api/v1/documents/search?q=${encodeURIComponent(searchTerm)}&from=0&size=100`);
+                const data = await response.json();
+                displaySearchResults(data);
+            } catch (error) {
+                console.error('Erreur lors de la recherche:', error);
+                document.getElementById('searchResults').innerHTML = 'Erreur lors de la recherche.';
+            }
+        }
+
+        function displaySearchResults(results) {
+            const resultsDiv = document.getElementById('searchResults');
+            resultsDiv.innerHTML = '';
+            if (results.documents && results.documents.length > 0) {
+                results.documents.forEach(document => {
+                    resultsDiv.innerHTML += `
+                        <div>
+                            <p>Fichier: ${document.filename}</p>
+                        </div>
+                        <hr>
+                    `;
+                });
+            } else {
+                resultsDiv.innerHTML = 'Aucun résultat trouvé.';
+            }
+        }
+
+        // Boutons de synchronisation
+        document.getElementById('syncButton').addEventListener('click', () => startSync(false));
+        document.getElementById('forceSyncButton').addEventListener('click', () => startSync(true));
+
+        // Bouton de recherche
+        document.getElementById('searchButton').addEventListener('click', searchDocuments);
+
+        // Recherche en appuyant sur Entrée dans le champ de recherche
+        document.getElementById('searchInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchDocuments();
+            }
+        });
+    </script>
+</body>
+</html>

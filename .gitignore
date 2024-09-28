@@ -1,0 +1,35 @@
+# Environnements virtuels
+venv/
+env/
+.env
+
+# Fichiers Python compilés
+__pycache__/
+*.py[cod]
+
+# Logs et bases de données
+*.log
+*.sqlite
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers IDE
+.idea/
+.vscode/
+
+# Fichiers de distribution
+dist/
+build/
+*.egg-info/
+
+# Fichiers de test et couverture
+.pytest_cache/
+.coverage
+
+# Fichiers d'environnement
+.env
+.env.local
+
+client_secret.json
