@@ -1,30 +1,21 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
-from starlette.responses import RedirectResponse
 from typing import List, Dict, Any
 from app.services.gmail_service import GmailService
-from app.core.config import settings
 from app.api.dependencies import get_gmail_service, get_opensearch_service
 from app.services.opensearch_service import OpenSearchService
 from fastapi.responses import StreamingResponse
 from typing import AsyncGenerator
 import asyncio
+
+from app.services.storage_service import StorageService
+
 import json
 
 router = APIRouter()
 
 @router.get("/")
 async def root():
-    return {"message": "Bienvenue sur l'API Gmail"}
-
-@router.get("/authorize")
-async def authorize(gmail_service: GmailService = Depends(get_gmail_service)):
-    authorization_url = gmail_service.get_authorization_url(settings.REDIRECT_URI)
-    return RedirectResponse(authorization_url)
-
-@router.get("/oauth2callback")
-async def oauth2callback(code: str, gmail_service: GmailService = Depends(get_gmail_service)):
-    gmail_service.fetch_token(code, settings.REDIRECT_URI)
-    return {"message": "Authentification réussie"}
+    return {"message": "Welcome to the Gmail API"}
 
 @router.get("/emails", response_model=List[Dict[str, Any]])
 async def get_emails(gmail_service: GmailService = Depends(get_gmail_service)):
@@ -43,31 +34,38 @@ async def get_pdf_attachments_route(
 ):
     async def event_generator() -> AsyncGenerator[str, None]:
         try:
-            yield "data: Début de la synchronisation...\n\n"
+            yield f"data: {json.dumps({'event': 'start', 'message': 'Starting synchronization...'})}\n\n"
             await asyncio.sleep(0.1)
 
+            attachments = await gmail_service.get_pdf_attachments(year, month, force_sync)
+            yield f"data: {json.dumps({'event': 'get_total', 'total': len(attachments)})}\n\n"
+            
             attachment_count = 0
             skipped_count = 0
-            async for attachment in gmail_service.get_pdf_attachments(year, month, force_sync):
+            for attachment in attachments:
                 try:
-                    # Extraction du texte du PDF
+                    # Extracting text from PDF
                     pdf_text = opensearch_service.extract_text_from_pdf(attachment['data'])
                     attachment['content'] = pdf_text
 
+                    sanitized_filename = StorageService.sanitize_filename(attachment['filename'])
+                    attachment['filename'] = sanitized_filename
                     result = opensearch_service.index_pdf_attachment(attachment)
+                    StorageService.store_on_disk(attachment['data'], sanitized_filename)
+                    
                     if result['status'] == 'skipped':
                         skipped_count += 1
-                        yield f"data: Fichier déjà indexé, ignoré : {attachment['filename']}\n\n"
+                        yield f"data: {json.dumps({'event': 'skipped', 'message': f'File already indexed, skipped: {attachment["filename"]}'})}\n\n"
                     else:
                         attachment_count += 1
-                        yield f"data: Indexation de {attachment['filename']} : {result['status']}\n\n"
+                        yield f"data: {json.dumps({'event': 'indexed', 'message': f'Indexing {attachment["filename"]}: {result["status"]}'})}\n\n"
                 except Exception as e:
-                    yield f"data: Erreur lors de l'indexation de {attachment['filename']} : {str(e)}\n\n"
+                    yield f"data: {json.dumps({'event': 'error', 'message': f'Error while indexing {attachment["filename"]}: {str(e)}'})}\n\n"
                 await asyncio.sleep(0.1)
 
-            yield f"data: Synchronisation terminée. {attachment_count} fichiers indexés, {skipped_count} fichiers ignorés.\n\n"
+            yield f"data: {json.dumps({'event': 'end', 'message': f'Synchronization completed. {attachment_count} files indexed, {skipped_count} files skipped.'})}\n\n"
         except Exception as e:
-            yield f"data: Erreur lors de la synchronisation : {str(e)}\n\n"
+            yield f"data: {json.dumps({'event': 'error', 'message': f'Error during synchronization: {str(e)}'})}\n\n"
         finally:
             yield "data: [END]\n\n"
 

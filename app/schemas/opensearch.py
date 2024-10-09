@@ -1,3 +1,4 @@
+from opensearchpy import Field
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 
@@ -16,7 +17,7 @@ class SearchQuery(BaseModel):
 class SearchResponse(BaseModel):
     total: int
     hits: List[Document]
-    max_score: float
+    max_score: Optional[float] = Field(None)
 
 class IndexResponse(BaseModel):
     _index: str

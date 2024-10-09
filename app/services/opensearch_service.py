@@ -20,7 +20,7 @@ class OpenSearchService:
                 "query": {
                     "bool": {
                         "must": [
-                            {"match": {"filename": filename}},
+                            {"term": {"filename.keyword": filename}},
                             {"match": {"date": date}}
                         ]
                     }
@@ -42,7 +42,8 @@ class OpenSearchService:
                 'filename': attachment['filename'],
                 'subject': attachment['subject'],
                 'date': attachment['date'],
-                'content': attachment['content']
+                'content': attachment['content'],
+                'url': 'http://localhost:8000/attachments/' + attachment['filename']
             }
             
             print(f"Document à indexer : {document}")

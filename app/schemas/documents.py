@@ -4,6 +4,7 @@ from typing import List, Optional
 class Document(BaseModel):
     id: str
     filename: str
+    url: str
 
 class SearchQuery(BaseModel):
     q: str

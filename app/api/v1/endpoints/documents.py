@@ -23,7 +23,7 @@ async def search(
         
         search_response = opensearch_service.search(search_query)
     
-        documents = [Document(id=doc.id, filename=doc.content["filename"]) for doc in search_response.hits]
+        documents = [Document(id=doc.id, filename=doc.content["filename"], url=doc.content["url"]) for doc in search_response.hits]
       
         return SearchResponse(
             status="success",
